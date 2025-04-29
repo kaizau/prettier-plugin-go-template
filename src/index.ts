@@ -85,6 +85,8 @@ export const printers = {
           return printMultiBlock(node, path, print);
         case "unformattable":
           return printUnformattable(node, options);
+        case "comment":
+          return node.content;
       }
 
       throw new Error(

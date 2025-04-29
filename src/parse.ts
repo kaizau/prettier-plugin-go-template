@@ -3,7 +3,7 @@ import { createIdGenerator } from "./create-id-generator";
 
 export const parseGoTemplate: Parser<GoNode>["parse"] = (text, options) => {
   const regex =
-    /{{(?<startdelimiter>-|<|%|\/\*)?\s*(?<statement>(?<keyword>if|range|block|with|define|end|else|prettier-ignore-start|prettier-ignore-end)?[\s\S]*?)\s*(?<endDelimiter>-|>|%|\*\/)?}}|(?<unformattableScript><(script)((?!<)[\s\S])*>((?!<\/script)[\s\S])*?{{[\s\S]*?<\/(script)>)|(?<unformattableStyle><(style)((?!<)[\s\S])*>((?!<\/style)[\s\S])*?{{[\s\S]*?<\/(style)>)/g;
+    /(?<comment>{{(?:\/\*)[\s\S]*?(?:\*\/)}})|{{(?<startdelimiter>-|<|%|\/\*)?\s*(?<statement>(?<keyword>if|range|block|with|define|end|else|prettier-ignore-start|prettier-ignore-end)?[\s\S]*?)\s*(?<endDelimiter>-|>|%|\*\/)?}}|(?<unformattableScript><(script)((?!<)[\s\S])*>((?!<\/script)[\s\S])*?{{[\s\S]*?<\/(script)>)|(?<unformattableStyle><(style)((?!<)[\s\S])*>((?!<\/style)[\s\S])*?{{[\s\S]*?<\/(style)>)/g;
   const root: GoRoot = {
     type: "root",
     content: text,
@@ -22,6 +22,7 @@ export const parseGoTemplate: Parser<GoNode>["parse"] = (text, options) => {
     const statement = match.groups?.statement;
     const unformattable =
       match.groups?.unformattableScript ?? match.groups?.unformattableStyle;
+    const comment = match.groups?.comment;
 
     const startDelimiter = (match.groups?.startdelimiter ??
       "") as GoInlineStartDelimiter;
@@ -43,6 +44,18 @@ export const parseGoTemplate: Parser<GoNode>["parse"] = (text, options) => {
         index: match.index,
         length: match[0].length,
         content: unformattable,
+        parent: current,
+      };
+      continue;
+    }
+
+    if (comment) {
+      current.children[id] = {
+        id,
+        type: "comment",
+        index: match.index,
+        length: match[0].length,
+        content: comment,
         parent: current,
       };
       continue;
@@ -189,6 +202,7 @@ export type GoNode =
   | GoBlock
   | GoInline
   | GoMultiBlock
+  | GoComment
   | GoUnformattable;
 
 export type GoBlockKeyword =
@@ -248,6 +262,10 @@ export interface GoUnformattable extends GoBaseNode<"unformattable"> {
   content: string;
 }
 
+export interface GoComment extends GoBaseNode<"comment"> {
+  content: string;
+}
+
 export interface WithDelimiter {
   startDelimiter: GoInlineStartDelimiter;
   endDelimiter: GoInlineEndDelimiter;
@@ -271,6 +289,10 @@ export function isMultiBlock(node: GoNode): node is GoMultiBlock {
 
 export function isRoot(node: GoNode): node is GoRoot {
   return node.type === "root";
+}
+
+export function isComment(node: GoNode): node is GoComment {
+  return node.type === "comment";
 }
 
 export function isUnformattable(node: GoNode): node is GoRoot {
